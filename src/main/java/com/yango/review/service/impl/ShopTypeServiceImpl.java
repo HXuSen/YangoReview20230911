@@ -28,7 +28,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
         if (CollectionUtil.isNotEmpty(typeList)){
             List<ShopType> shopTypes = typeList.stream()
                     .map(str -> JSONUtil.toBean(str, ShopType.class))
-                    .sorted()
+                    //.sorted()
                     .collect(Collectors.toList());
             return Result.ok(shopTypes);
         }
