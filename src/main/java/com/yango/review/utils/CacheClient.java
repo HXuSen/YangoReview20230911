@@ -48,7 +48,7 @@ public class CacheClient {
     public <R,ID> R queryWithPassThrough(String keyPrefix, ID id, Class<R> type, Function<ID,R> dbFallback,Long time, TimeUnit unit){
         String key = keyPrefix + id;
         //1.根据id从redis中查询
-        String json = stringRedisTemplate.opsForValue().get(CACHE_SHOP_KEY + id);
+        String json = stringRedisTemplate.opsForValue().get(key);
         //2.判断是否存在
         if (StrUtil.isNotBlank(json)) {
             //2.1存在 返回
@@ -61,7 +61,7 @@ public class CacheClient {
         R r = dbFallback.apply(id);
         //3.1不存在,返回错误
         if (r == null) {
-            stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id,"",CACHE_NULL_TTL,TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(key,"",CACHE_NULL_TTL,TimeUnit.MINUTES);
             return null;
         }
         //3.2存在 写入redis,返回
