@@ -7,8 +7,10 @@ import com.yango.review.entity.VoucherOrder;
 import com.yango.review.mapper.VoucherOrderMapper;
 import com.yango.review.service.ISeckillVoucherService;
 import com.yango.review.service.IVoucherOrderService;
+import com.yango.review.service.IVoucherService;
 import com.yango.review.utils.RedisIdWorker;
 import com.yango.review.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +25,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIdWorker redisIdWorker;
 
     @Override
-    @Transactional
     public Result seckillVoucher(Long voucherId) {
         //1.查询优惠券信息
         SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
@@ -41,10 +42,30 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (seckillVoucher.getStock() < 1) {
             return Result.fail("库存不足");
         }
+        Long userId = UserHolder.getUser().getId();
+        synchronized (userId.toString().intern()) {
+            //获取代理对象(事务)
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        }
+    }
+
+    @Transactional
+    public Result createVoucherOrder(Long voucherId) {
+        Long userId = UserHolder.getUser().getId();
+        //一人一单
+        int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        if (count > 0){
+            return Result.fail("一人仅限一单");
+        }
         //4.扣减库存
-        //seckillVoucherService.update().setSql("stock = stock - 1").eq("voucher_id",voucherId).update();
-        seckillVoucher.setStock(seckillVoucher.getStock() - 1);
-        boolean success = seckillVoucherService.updateById(seckillVoucher);
+        boolean success = seckillVoucherService.update()
+                .setSql("stock = stock - 1")
+                //where id = ? and stock = ? #乐观锁
+                //.eq("voucher_id", voucherId).eq("stock",seckillVoucher.getStock())
+                //stock > 0
+                .eq("voucher_id", voucherId).gt("stock",0)
+                .update();
         if (!success) {
             return Result.fail("库存不足");
         }
