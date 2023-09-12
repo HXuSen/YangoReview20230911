@@ -2,7 +2,6 @@ package com.yango.review.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.json.JSONUtil;
-import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yango.review.dto.Result;
 import com.yango.review.entity.ShopType;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,7 +28,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
         if (CollectionUtil.isNotEmpty(typeList)){
             List<ShopType> shopTypes = typeList.stream()
                     .map(str -> JSONUtil.toBean(str, ShopType.class))
-                    .sorted((o1, o2) -> o1.getSort() - o2.getSort())
+                    .sorted()
                     .collect(Collectors.toList());
             return Result.ok(shopTypes);
         }
