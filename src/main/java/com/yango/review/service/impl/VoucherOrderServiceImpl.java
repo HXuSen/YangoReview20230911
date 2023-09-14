@@ -10,6 +10,8 @@ import com.yango.review.service.IVoucherOrderService;
 import com.yango.review.utils.RedisIdWorker;
 import com.yango.review.utils.SimpleRedisLock;
 import com.yango.review.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIdWorker redisIdWorker;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private RedissonClient redissonClient;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -51,8 +55,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         //    IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
         //    return proxy.createVoucherOrder(voucherId);
         //}
-        SimpleRedisLock lock = new SimpleRedisLock(stringRedisTemplate, "order:" + userId);
-        boolean isLock = lock.tryLock(5);
+        //SimpleRedisLock lock = new SimpleRedisLock(stringRedisTemplate, "order:" + userId);
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        //boolean isLock = lock.tryLock(5);
+        boolean isLock = lock.tryLock();
         if (!isLock){
             return Result.fail("不允许重复下单");
         }
@@ -63,7 +69,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         } catch (IllegalStateException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unLock();
+            lock.unlock();
         }
     }
 
