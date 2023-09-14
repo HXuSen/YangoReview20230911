@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,7 +29,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
         if (CollectionUtil.isNotEmpty(typeList)){
             List<ShopType> shopTypes = typeList.stream()
                     .map(str -> JSONUtil.toBean(str, ShopType.class))
-                    //.sorted()
+                    .sorted((o1, o2) -> o1.getSort() - o2.getSort())
                     .collect(Collectors.toList());
             return Result.ok(shopTypes);
         }
