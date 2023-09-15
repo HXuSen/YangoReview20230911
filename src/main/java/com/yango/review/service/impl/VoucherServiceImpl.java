@@ -7,17 +7,22 @@ import com.yango.review.entity.Voucher;
 import com.yango.review.mapper.VoucherMapper;
 import com.yango.review.service.ISeckillVoucherService;
 import com.yango.review.service.IVoucherService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.List;
 
+import static com.yango.review.utils.RedisConstants.SECKILL_STOCK_KEY;
+
 @Service
 public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> implements IVoucherService {
 
     @Resource
     private ISeckillVoucherService seckillVoucherService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result queryVoucherOfShop(Long shopId) {
@@ -39,5 +44,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setBeginTime(voucher.getBeginTime());
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
+
+        stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(),voucher.getStock().toString());
     }
 }
