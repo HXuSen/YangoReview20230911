@@ -3,9 +3,11 @@ package com.yango.review.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yango.review.dto.Result;
+import com.yango.review.dto.ScrollResult;
 import com.yango.review.dto.UserDTO;
 import com.yango.review.entity.Blog;
 import com.yango.review.entity.Follow;
@@ -17,15 +19,18 @@ import com.yango.review.service.IUserService;
 import com.yango.review.utils.SystemConstants;
 import com.yango.review.utils.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.yango.review.utils.RedisConstants.BLOG_LIKED_KEY;
+import static com.yango.review.utils.RedisConstants.FEED_KEY;
 
 @Service
 public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
@@ -104,11 +109,53 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         List<Follow> follows = followService.query().eq("follow_user_id", user.getId()).list();
         //推送博文id给粉丝
         for (Follow follow : follows) {
-            String key = "feed:" + follow.getUserId();
+            String key = FEED_KEY + follow.getUserId();
             stringRedisTemplate.opsForZSet().add(key,blog.getId().toString(),System.currentTimeMillis());
         }
         // 返回id
         return Result.ok(blog.getId());
+    }
+
+    @Override
+    public Result queryBlogOfFollow(Long max, Integer offset) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null){
+            return Result.fail("请先登录");
+        }
+        //查询收件箱
+        String key = FEED_KEY + user.getId();
+        Set<ZSetOperations.TypedTuple<String>> blogIds = stringRedisTemplate.opsForZSet()
+                .reverseRangeByScoreWithScores(key, 0, max, offset, 2);
+        if (blogIds == null || blogIds.isEmpty()){
+            return Result.ok(Collections.emptyList());
+        }
+        //解析数据:blogId,minTime,offset
+        List<Long> ids = new ArrayList<>(blogIds.size());
+        long minTime = 0;
+        int count = 1;
+        for (ZSetOperations.TypedTuple<String> tuple : blogIds) {
+            ids.add(Long.valueOf(tuple.getValue()));
+            long current = tuple.getScore().longValue();
+            if (current == minTime){
+                count++;
+            }else{
+                minTime = current;
+                count = 1;
+            }
+        }
+        //根据id查询blog
+        String idStr = StrUtil.join(",", ids);
+        List<Blog> blogs = query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list();
+        for (Blog blog : blogs) {
+            queryBlogUser(blog);
+            isBlogLiked(blog);
+        }
+        //封装返回
+        ScrollResult result = new ScrollResult();
+        result.setList(blogs);
+        result.setOffset(count);
+        result.setMinTime(minTime);
+        return Result.ok(result);
     }
 
     @Override
@@ -138,6 +185,5 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         blog.setName(user.getNickName());
         blog.setIcon(user.getIcon());
     }
-
 
 }
