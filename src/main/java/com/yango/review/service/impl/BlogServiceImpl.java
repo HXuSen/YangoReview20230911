@@ -8,9 +8,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yango.review.dto.Result;
 import com.yango.review.dto.UserDTO;
 import com.yango.review.entity.Blog;
+import com.yango.review.entity.Follow;
 import com.yango.review.entity.User;
 import com.yango.review.mapper.BlogMapper;
 import com.yango.review.service.IBlogService;
+import com.yango.review.service.IFollowService;
 import com.yango.review.service.IUserService;
 import com.yango.review.utils.SystemConstants;
 import com.yango.review.utils.UserHolder;
@@ -31,6 +33,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private IUserService userService;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private IFollowService followService;
 
     @Override
     public Result queryHotBlog(Integer current) {
@@ -84,6 +88,27 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .collect(Collectors.toList());
 
         return Result.ok(userDTOS);
+    }
+
+    @Override
+    public Result saveBlog(Blog blog) {
+        // 获取登录用户
+        UserDTO user = UserHolder.getUser();
+        blog.setUserId(user.getId());
+        // 保存探店博文
+        boolean isSuccess = save(blog);
+        if (!isSuccess){
+            return Result.fail("发布博文失败!");
+        }
+        //查询作者所有粉丝
+        List<Follow> follows = followService.query().eq("follow_user_id", user.getId()).list();
+        //推送博文id给粉丝
+        for (Follow follow : follows) {
+            String key = "feed:" + follow.getUserId();
+            stringRedisTemplate.opsForZSet().add(key,blog.getId().toString(),System.currentTimeMillis());
+        }
+        // 返回id
+        return Result.ok(blog.getId());
     }
 
     @Override
