@@ -1,8 +1,6 @@
 package com.yango.review.test;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yango.review.entity.Shop;
-import com.yango.review.service.IShopService;
 import com.yango.review.service.impl.ShopServiceImpl;
 import com.yango.review.utils.RedisIdWorker;
 import org.junit.Test;
@@ -15,7 +13,6 @@ import org.springframework.test.context.junit4.SpringRunner;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -84,6 +81,20 @@ public class ReviewApplicationTest {
             }
             stringRedisTemplate.opsForGeo().add(key,locations);
         }
+    }
 
+    @Test
+    public void testHyperLogLog(){
+        String[] values = new String[1000];
+        int j;
+        for (int i = 0; i < 1000000; i++) {
+            j = i % 1000;
+            values[j] = "user_" + i;
+            if (j == 999){
+                stringRedisTemplate.opsForHyperLogLog().add("hl2",values);
+            }
+        }
+        Long size = stringRedisTemplate.opsForHyperLogLog().size("hl2");
+        System.out.println("size = " + size);
     }
 }
